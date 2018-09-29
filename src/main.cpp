@@ -177,6 +177,38 @@ void processSetPWMValues() {
     }
 }
 
+/**
+ * 0xD0 - Set Digital output
+ * Takes two data bytes and returns nothing.
+ * The first data byte represents the selected ports to update, and the second
+ * represents the values to update. 
+ * If bit n of the data byte is set, the corresponding value for channel n+2
+ * (i.e. bit 0 = channel 2, bit 1 = channel 3, etc) will be set to HIGH/LOW 
+ * depending on the bits set in the 2nd data byte
+ * TBD: If the channel is NOT configured as an output, the value of that bit
+ */
+void processSetDigitalValues() {
+    buffer.erase(buffer.begin());
+    if (buffer.size() >= 2) {
+        byte updateMask = buffer[0];
+        byte valueMask = buffer[1];
+
+        // TBD: Check for pin configuration
+        for (int i = 0; i < 6; i++) {
+            if (updateMask >> i & 0x1) {
+                if (valueMask >> i & 0x1) {
+                    digitalWrite(digitalChannelMap[i], HIGH);
+                }
+                else {
+                    digitalWrite(digitalChannelMap[i], LOW);
+                }
+            }
+        }
+        buffer.erase(buffer.begin());
+        buffer.erase(buffer.begin());
+    }
+}
+
 void processBuffer() {
     ensureValidBuffer();
     if (buffer.size() == 0) {
@@ -189,11 +221,11 @@ void processBuffer() {
             // Get Signature
             processGetSignature();
             break;
-        case 0x82: 
+        case 0x82: // Get Digital input values
             if (buffer.size() < 2) return;
             processGetDigitalInputValues();
             break;
-        case 0x83:
+        case 0x83: // Get analog input values
             if (buffer.size() < 2) return;
             processGetAnalogInputValues();
             break;
@@ -208,6 +240,10 @@ void processBuffer() {
         case 0xCD: // PWM3 - Forward
             if (buffer.size() < 2) return;
             processSetPWMValues();
+            break;
+        case 0xD0: // Set Digital Output
+            if (buffer.size() < 3) return;
+            processSetDigitalValues();
             break;
         default: 
             // Invalid command, strip this and then make the buffer valid again
